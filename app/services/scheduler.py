@@ -20,6 +20,7 @@ from app.repositories import users as user_repo
 from app.services import review_service
 from app.services.clock import now_in, today_in
 from app.services.max_client import MaxClient, get_max_client
+from app.services.time_settings import effective_review_time
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,8 @@ def run_daily_review_tick(
     with session_scope() as session:
         for user in user_repo.all_consented(session):
             local = now_in(user.timezone)
-            if local.hour != settings.daily_review_hour or local.minute != settings.daily_review_minute:
+            hour, minute = effective_review_time(user, settings)
+            if local.hour != hour or local.minute != minute:
                 continue
 
             day = today_in(user.timezone)

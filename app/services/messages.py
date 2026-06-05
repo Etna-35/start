@@ -61,14 +61,33 @@ HELP = (
     "D - слив времени\n\n"
     "Пример оценки:\n"
     "1A 2B 3D\n\n"
+    "После первой записи за день я напомню про вечернюю оценку. "
+    "Дальше просто отмечаю каждую запись галочкой ✅.\n\n"
     "Команды:\n"
     "/today - список за сегодня\n"
     "/summary - итог дня\n"
     "/community - обезличенная статистика сообщества\n"
     "/export - экспорт за 7 дней\n"
+    "/time - время вечерней оценки, например /time 21:30\n"
     "/delete_today - удалить записи за сегодня\n"
     "/delete_me - удалить все свои данные"
 )
+
+# Text (non-slash) messages that should also show help.
+HELP_ALIASES = {"помощь", "справка", "правила", "help", "хелп"}
+
+# Acknowledgement for entries after the first one of the day.
+ENTRY_ACK = "✅"
+
+
+def first_entry_reply(duration_str: str, action_text: str, review_time: str) -> str:
+    return (
+        "Записал ✅\n"
+        f"{duration_str} - {action_text}\n\n"
+        "Это первая запись за сегодня. Шли действия в течение дня, "
+        f"а вечером в {review_time} я пришлю список — оценишь каждое по A/B/C/D.\n"
+        "Правила оценок: /help"
+    )
 
 CONFIRM_DELETE_TODAY = (
     "Это удалит все твои записи за сегодня. Для подтверждения напиши: УДАЛИТЬ СЕГОДНЯ"

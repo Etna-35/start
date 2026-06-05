@@ -4,20 +4,27 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.config import Settings
 from app.models.user import User
 from app.repositories import parse_errors as parse_error_repo
 from app.repositories import time_entries as entry_repo
 from app.services import messages
 from app.services.duration_parser import parse_entry
+from app.services.time_settings import effective_review_time, format_hhmm
 from app.services.timefmt import format_minutes
 
 
-def handle_entry(session: Session, user: User, raw_text: str, day: date) -> str:
+def handle_entry(
+    session: Session, user: User, raw_text: str, day: date, settings: Settings
+) -> str:
     parsed = parse_entry(raw_text)
     if parsed is None:
         # On MVP we do not store entries without a duration; log the parse miss.
         parse_error_repo.record(session, user.id, raw_text, "duration_not_found")
         return messages.DURATION_NOT_FOUND
+
+    # Is this the first entry of the day? (check before inserting)
+    is_first = not entry_repo.list_for_day(session, user.id, day)
 
     entry_repo.create(
         session,
@@ -27,8 +34,11 @@ def handle_entry(session: Session, user: User, raw_text: str, day: date) -> str:
         action_text=parsed.action_text,
         raw_text=raw_text,
     )
-    return (
-        "Записал:\n"
-        f"{format_minutes(parsed.duration_min)} - {parsed.action_text}\n"
-        "Оценку A/B/C/D поставим вечером."
-    )
+
+    if is_first:
+        review_time = format_hhmm(*effective_review_time(user, settings))
+        return messages.first_entry_reply(
+            format_minutes(parsed.duration_min), parsed.action_text, review_time
+        )
+    # Subsequent entries: a quiet green-check acknowledgement.
+    return messages.ENTRY_ACK

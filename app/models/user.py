@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,6 +23,9 @@ class User(Base, TimestampMixin):
     role: Mapped[str] = mapped_column(String(32), default=ROLE_MEMBER, nullable=False)
     consent_accepted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), default="Europe/Moscow", nullable=False)
+    # Per-user evening review time. NULL → fall back to the global default.
+    review_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    review_minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     entries = relationship("TimeEntry", back_populates="user", cascade="all, delete-orphan")

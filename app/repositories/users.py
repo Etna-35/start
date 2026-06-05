@@ -41,6 +41,11 @@ def accept_consent(session: Session, user: User) -> None:
     user.consent_accepted = True
 
 
+def set_review_time(session: Session, user: User, hour: int, minute: int) -> None:
+    user.review_hour = hour
+    user.review_minute = minute
+
+
 def soft_delete(session: Session, user: User) -> None:
     user.deleted_at = datetime.now(timezone.utc)
 

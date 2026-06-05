@@ -70,10 +70,14 @@ def _route(session: Session, incoming: IncomingMessage, settings: Settings) -> s
     if text.startswith("/"):
         return command_handler.handle_command(session, user, text, settings, day)
 
+    # Plain-text help triggers (work even before consent).
+    if text.lower() in messages.HELP_ALIASES:
+        return messages.HELP
+
     if not user.consent_accepted:
         return messages.NEED_CONSENT
 
     if is_review_format(text):
         return review_handler.handle_review(session, user, text, day)
 
-    return entry_handler.handle_entry(session, user, text, day)
+    return entry_handler.handle_entry(session, user, text, day, settings)

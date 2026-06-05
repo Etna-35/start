@@ -14,6 +14,7 @@ from app.services import messages, review_service
 from app.services.clock import today_in
 from app.services.privacy_service import ExportEntry, build_export
 from app.services.summary_service import EntryStat
+from app.services.time_settings import effective_review_time, format_hhmm, parse_review_time
 
 
 def handle_command(
@@ -41,6 +42,8 @@ def handle_command(
         return _community(session, settings)
     if command == "export":
         return _export(session, user)
+    if command in ("time", "время", "vremya"):
+        return _set_time(session, user, text, settings)
     if command == "delete_today":
         return messages.CONFIRM_DELETE_TODAY
     if command == "delete_me":
@@ -54,6 +57,24 @@ def handle_command(
 def _agree(session: Session, user: User) -> str:
     user_repo.accept_consent(session, user)
     return messages.AGREE_DONE
+
+
+def _set_time(session: Session, user: User, text: str, settings: Settings) -> str:
+    parts = text.split(maxsplit=1)
+    arg = parts[1] if len(parts) > 1 else ""
+    parsed = parse_review_time(arg)
+    if parsed is None:
+        current = format_hhmm(*effective_review_time(user, settings))
+        return (
+            f"Сейчас вечерняя оценка приходит в {current} (часовой пояс {user.timezone}).\n"
+            "Чтобы изменить, укажи время в формате ЧЧ:ММ, например:\n/time 21:30"
+        )
+    hour, minute = parsed
+    user_repo.set_review_time(session, user, hour, minute)
+    return (
+        f"Готово. Список для вечерней оценки буду присылать в {format_hhmm(hour, minute)} "
+        f"(часовой пояс {user.timezone})."
+    )
 
 
 def _community(session: Session, settings: Settings) -> str:
