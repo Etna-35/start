@@ -13,6 +13,7 @@ from app.models.time_entry import TimeEntry, VALID_SCORES
 from app.repositories import review_sessions as review_repo
 from app.repositories import time_entries as entry_repo
 from app.services import messages
+from app.services.formatting import esc
 from app.services.summary_service import EntryStat, build_summary, format_summary
 from app.services.timefmt import format_minutes
 
@@ -23,7 +24,9 @@ def _render_list(entries: list[TimeEntry], with_scores: bool) -> str:
         tail = ""
         if with_scores:
             tail = f" [{entry.abc_score}]" if entry.abc_score else " [без оценки]"
-        lines.append(f"{idx}. {format_minutes(entry.duration_min)} - {entry.action_text}{tail}")
+        lines.append(
+            f"<b>{idx}.</b> {format_minutes(entry.duration_min)} — {esc(entry.action_text)}{tail}"
+        )
     return "\n".join(lines)
 
 
@@ -36,10 +39,10 @@ def render_today(session: Session, user_id: uuid.UUID, day: date) -> str | None:
     review_repo.create(session, user_id, day, [str(e.id) for e in entries])
     body = _render_list(entries, with_scores=True)
     return (
-        "Твои действия сегодня:\n\n"
+        "<b>Твои действия сегодня</b>\n\n"
         f"{body}\n\n"
         "Чтобы оценить, напиши:\n"
-        "1A 2B 3D"
+        "<b>1A 2B 3D</b>"
     )
 
 

@@ -56,16 +56,16 @@ def aggregate(per_user_entries: dict[str, list[EntryStat]]) -> CommunityStats:
 
 def format_community_stats(stats: CommunityStats) -> str:
     lines = [
-        "Статистика сообщества сегодня:",
+        "<b>Статистика сообщества сегодня</b>",
         "",
-        f"Активных участников: {stats.active_users}",
-        f"Всего записей: {stats.total_entries}",
-        f"Общее зафиксированное время: {format_minutes(stats.total_min)}",
+        f"Активных участников: <b>{stats.active_users}</b>",
+        f"Всего записей: <b>{stats.total_entries}</b>",
+        f"Общее зафиксированное время: <b>{format_minutes(stats.total_min)}</b>",
         "",
-        "Средняя структура дня:",
+        "<b>Средняя структура дня</b>",
     ]
     for s in SCORES:
-        lines.append(f"{s} - {stats.avg_percent_by_score[s]}%")
+        lines.append(f"<b>{s}</b> — {stats.avg_percent_by_score[s]}%")
     lines.append("")
-    lines.append("Данные обезличены. Конкретные действия участников не показываются.")
+    lines.append("<i>Данные обезличены. Конкретные действия участников не показываются.</i>")
     return "\n".join(lines)

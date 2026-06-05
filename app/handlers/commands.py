@@ -66,14 +66,15 @@ def _set_time(session: Session, user: User, text: str, settings: Settings) -> st
     if parsed is None:
         current = format_hhmm(*effective_review_time(user, settings))
         return (
-            f"Сейчас вечерняя оценка приходит в {current} (часовой пояс {user.timezone}).\n"
+            f"Сейчас вечерняя оценка приходит в <b>{current}</b> "
+            f"(часовой пояс {user.timezone}).\n"
             "Чтобы изменить, укажи время в формате ЧЧ:ММ, например:\n/time 21:30"
         )
     hour, minute = parsed
     user_repo.set_review_time(session, user, hour, minute)
     return (
-        f"Готово. Список для вечерней оценки буду присылать в {format_hhmm(hour, minute)} "
-        f"(часовой пояс {user.timezone})."
+        f"Готово ✅ Список для вечерней оценки буду присылать в "
+        f"<b>{format_hhmm(hour, minute)}</b> (часовой пояс {user.timezone})."
     )
 
 

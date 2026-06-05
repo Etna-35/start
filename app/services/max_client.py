@@ -40,17 +40,20 @@ class MaxClient:
             logger.exception("MAX get_me error: %s", exc)
             return None
 
-    def send_message(self, user_id: str | int, text: str) -> bool:
+    def send_message(self, user_id: str | int, text: str, fmt: str | None = "html") -> bool:
         """Send a text message to a user. Returns True on success.
 
-        MAX: POST /messages?user_id=<id> with JSON body {"text": "..."},
-        token in the Authorization header.
+        MAX: POST /messages?user_id=<id> with JSON body {"text": "...",
+        "format": "html"}, token in the Authorization header.
         """
+        body: dict = {"text": text}
+        if fmt:
+            body["format"] = fmt
         try:
             response = self._client.post(
                 "/messages",
                 params={"user_id": str(user_id)},
-                json={"text": text},
+                json=body,
             )
             if response.status_code >= 400:
                 logger.error("MAX send_message failed: %s %s", response.status_code, response.text)

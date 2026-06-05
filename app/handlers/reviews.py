@@ -24,4 +24,4 @@ def handle_review(session: Session, user: User, raw_text: str, day: date) -> str
         )
 
     summary = review_service.build_day_summary_text(session, user.id, day)
-    return f"Принял оценки: {applied}.\n\n{summary}"
+    return f"Принял оценки: <b>{applied}</b>.\n\n{summary}"

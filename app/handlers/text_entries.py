@@ -10,6 +10,7 @@ from app.repositories import parse_errors as parse_error_repo
 from app.repositories import time_entries as entry_repo
 from app.services import messages
 from app.services.duration_parser import parse_entry
+from app.services.formatting import esc
 from app.services.time_settings import effective_review_time, format_hhmm
 from app.services.timefmt import format_minutes
 
@@ -38,7 +39,7 @@ def handle_entry(
     if is_first:
         review_time = format_hhmm(*effective_review_time(user, settings))
         return messages.first_entry_reply(
-            format_minutes(parsed.duration_min), parsed.action_text, review_time
+            format_minutes(parsed.duration_min), esc(parsed.action_text), review_time
         )
     # Subsequent entries: a quiet green-check acknowledgement.
     return messages.ENTRY_ACK

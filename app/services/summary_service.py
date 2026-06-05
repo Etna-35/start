@@ -84,14 +84,21 @@ def _build_conclusion(total_min: int, pct: dict[str, int]) -> list[str]:
 
 
 def format_summary(summary: DailySummary) -> str:
-    lines = ["Итог дня:", "", f"Всего зафиксировано: {format_minutes(summary.total_min)}", ""]
+    lines = [
+        "<b>Итог дня:</b>",
+        "",
+        f"Всего зафиксировано: <b>{format_minutes(summary.total_min)}</b>",
+        "",
+    ]
     for s in SCORES:
         mins = format_minutes(summary.minutes_by_score[s])
-        lines.append(f"{s} - {mins} / {summary.percent_by_score[s]}%")
+        lines.append(f"<b>{s}</b> — {mins} / {summary.percent_by_score[s]}%")
     lines.append("")
     if summary.unscored_count:
-        lines.append(f"Без оценки: {summary.unscored_count} — оцени их, чтобы итог был точнее.")
+        lines.append(
+            f"<i>Без оценки: {summary.unscored_count} — оцени их, чтобы итог был точнее.</i>"
+        )
         lines.append("")
-    lines.append("Вывод:")
+    lines.append("<b>Вывод:</b>")
     lines.append(summary.conclusion or "Пока нет данных за день.")
     return "\n".join(lines)

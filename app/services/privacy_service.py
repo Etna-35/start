@@ -11,6 +11,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 
+from app.services.formatting import esc
 from app.services.timefmt import format_minutes
 
 
@@ -52,17 +53,17 @@ def build_export(entries: Iterable[ExportEntry], max_rows: int = 200) -> str:
     for e in truncated:
         by_date.setdefault(e.entry_date, []).append(e)
 
-    blocks: list[str] = ["Экспорт за последние 7 дней:", ""]
+    blocks: list[str] = ["<b>Экспорт за последние 7 дней</b>", ""]
     for day in sorted(by_date.keys(), reverse=True):
-        blocks.append(day.strftime("%Y-%m-%d"))
+        blocks.append(f"<b>{day.strftime('%Y-%m-%d')}</b>")
         for e in by_date[day]:
-            score = e.abc_score or "-"
-            blocks.append(f"- {format_minutes(e.duration_min)} | {score} | {e.action_text}")
+            score = e.abc_score or "—"
+            blocks.append(f"• {format_minutes(e.duration_min)} | {score} | {esc(e.action_text)}")
         blocks.append("")
 
     if len(entries) > max_rows:
         blocks.append(
-            f"Показаны последние {max_rows} записей. Полный CSV-экспорт добавим позже."
+            f"<i>Показаны последние {max_rows} записей. Полный CSV-экспорт добавим позже.</i>"
         )
     return "\n".join(blocks).strip()
 
@@ -71,13 +72,13 @@ def format_admin_stats(stats: AdminStats) -> str:
     """Admin-facing aggregate. Deliberately contains NO action texts or names."""
     return "\n".join(
         [
-            "Админ-статистика на сегодня:",
+            "<b>Админ-статистика на сегодня</b>",
             "",
-            f"Всего пользователей: {stats.total_users}",
-            f"С согласием: {stats.consented_users}",
-            f"Активных сегодня: {stats.active_today}",
-            f"Записей сегодня: {stats.entries_today}",
-            f"Оцененных записей сегодня: {stats.scored_entries_today}",
-            f"Ошибок парсинга сегодня: {stats.parse_errors_today}",
+            f"Всего пользователей: <b>{stats.total_users}</b>",
+            f"С согласием: <b>{stats.consented_users}</b>",
+            f"Активных сегодня: <b>{stats.active_today}</b>",
+            f"Записей сегодня: <b>{stats.entries_today}</b>",
+            f"Оцененных записей сегодня: <b>{stats.scored_entries_today}</b>",
+            f"Ошибок парсинга сегодня: <b>{stats.parse_errors_today}</b>",
         ]
     )
