@@ -21,9 +21,10 @@ def handle_entry(
 ) -> str | Reply:
     parsed = parse_entry(raw_text)
     if parsed is None:
-        # On MVP we do not store entries without a duration; log the parse miss.
+        # No duration: treat any free text ("конец", "я спать", forgot the time)
+        # as a gentle prompt offering the finish-day button, not a hard error.
         parse_error_repo.record(session, user.id, raw_text, "duration_not_found")
-        return messages.DURATION_NOT_FOUND
+        return Reply(messages.DURATION_NOT_FOUND, keyboards.finish_keyboard())
 
     # Is this the first entry of the day? (check before inserting)
     is_first = not entry_repo.list_for_day(session, user.id, day)
