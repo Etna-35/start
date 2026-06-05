@@ -109,10 +109,12 @@ class MaxClient:
             logger.exception("MAX answer_callback error: %s", exc)
             return False
 
-    def upload_image(self, path: str) -> str | None:
-        """Upload an image and return a reusable token (3-step MAX flow):
-        POST /uploads?type=image -> {url}; POST the file to {url} -> {token}.
-        Returns None on any failure."""
+    def upload_image(self, path: str) -> dict | None:
+        """Upload an image and return the reusable attachment payload.
+
+        MAX flow: POST /uploads?type=image -> {url}; POST the file to {url} ->
+        {"photos": {<id>: {"token": ...}}}. That whole object is the image
+        attachment payload. Returns None on any failure."""
         try:
             meta = self._client.post("/uploads", params={"type": "image"})
             if meta.status_code >= 400:
@@ -123,19 +125,26 @@ class MaxClient:
                 logger.error("MAX /uploads returned no url")
                 return None
             with open(path, "rb") as fh:
-                up = httpx.post(
-                    url,
-                    files={"data": (os.path.basename(path), fh, "image/png")},
-                    timeout=60.0,
-                )
+                data = fh.read()
+            if data[:3] == b"\xff\xd8\xff":
+                ctype = "image/jpeg"
+            elif data[:8] == b"\x89PNG\r\n\x1a\n":
+                ctype = "image/png"
+            else:
+                ctype = "application/octet-stream"
+            up = httpx.post(
+                url,
+                files={"data": (os.path.basename(path), data, ctype)},
+                timeout=60.0,
+            )
             if up.status_code >= 400:
                 logger.error("MAX image upload failed: %s %s", up.status_code, up.text)
                 return None
-            token = (up.json() or {}).get("token")
-            if not token:
-                logger.error("MAX image upload returned no token")
+            payload = up.json() or {}
+            if not payload.get("photos") and not payload.get("token"):
+                logger.error("MAX image upload: unexpected payload %s", payload)
                 return None
-            return token
+            return payload
         except (httpx.HTTPError, OSError, ValueError) as exc:
             logger.exception("MAX upload_image error: %s", exc)
             return None
