@@ -39,8 +39,9 @@ PAGE_SIZE = 10
 
 
 def render_page(entries: list[TimeEntry], page: int) -> ReviewView:
-    """Render a page of up to PAGE_SIZE actions: numbered list with ✅ marks,
-    plus per-item A/B/C/D buttons, page navigation, and bulk options."""
+    """Render a page of up to PAGE_SIZE actions as a list with ✔️ marks and a
+    👉 pointer on the current item, plus ONE compact A/B/C/D button set that
+    scores the pointed item and then advances to the next one."""
     total = len(entries)
     max_page = max(0, (total - 1) // PAGE_SIZE) if total else 0
     page = max(0, min(page, max_page))
@@ -48,28 +49,32 @@ def render_page(entries: list[TimeEntry], page: int) -> ReviewView:
     end = min(start + PAGE_SIZE, total)
     page_entries = entries[start:end]
     scored = sum(1 for e in entries if e.abc_score)
+    current = next((e for e in page_entries if e.abc_score is None), None)
 
     lines = [f"<b>Оценка дня</b> · оценено {scored}/{total}", ""]
     for i, e in enumerate(page_entries):
         num = start + i + 1
-        base = f"<b>{num}.</b> {format_minutes(e.duration_min)} — {esc(e.action_text)}"
+        body = f"<b>{num}.</b> {format_minutes(e.duration_min)} — {esc(e.action_text)}"
         if e.abc_score:
-            lines.append(f"✅ {base} · <b>{e.abc_score}</b>")
+            lines.append(f"✔️ {body} · <b>{e.abc_score}</b>")
+        elif current is not None and e.id == current.id:
+            lines.append(f"👉 {body}")
         else:
-            lines.append(f"▫️ {base}")
+            lines.append(f"▫️ {body}")
+    if current is not None:
+        lines.append("")
+        lines.append("👉 Оцени выделенный пункт кнопками ниже.")
     text = "\n".join(lines)
 
     rows: list[list[dict]] = []
-    for i, e in enumerate(page_entries):
-        num = start + i + 1
-        eid = str(e.id)
+    if current is not None:
+        cid = str(current.id)
         rows.append(
             [
-                keyboards.button(f"{num}", "rv|x"),
-                keyboards.button("A", f"rv|s|{eid}|A|{page}", "positive"),
-                keyboards.button("B", f"rv|s|{eid}|B|{page}"),
-                keyboards.button("C", f"rv|s|{eid}|C|{page}"),
-                keyboards.button("D", f"rv|s|{eid}|D|{page}", "negative"),
+                keyboards.button("A", f"rv|s|{cid}|A|{page}", "positive"),
+                keyboards.button("B", f"rv|s|{cid}|B|{page}"),
+                keyboards.button("C", f"rv|s|{cid}|C|{page}"),
+                keyboards.button("D", f"rv|s|{cid}|D|{page}", "negative"),
             ]
         )
     nav: list[dict] = []
