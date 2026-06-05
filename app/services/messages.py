@@ -116,7 +116,8 @@ HELP_ALIASES = {"помощь", "справка", "правила", "help", "х�
 FINISH_ALIASES = {"завершить", "завершить день", "оценить", "оценить день", "закончить день"}
 
 # Acknowledgement for entries after the first one of the day.
-ENTRY_ACK = "✅"
+# Plain text (not a lone emoji, which MAX renders oversized).
+ENTRY_ACK = "✔️ записано"
 
 
 def first_entry_reply(duration_str: str, action_text: str, review_time: str) -> str:
