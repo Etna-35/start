@@ -40,15 +40,23 @@ class MaxClient:
             logger.exception("MAX get_me error: %s", exc)
             return None
 
-    def send_message(self, user_id: str | int, text: str, fmt: str | None = "html") -> bool:
+    def send_message(
+        self,
+        user_id: str | int,
+        text: str,
+        fmt: str | None = "html",
+        attachments: list | None = None,
+    ) -> bool:
         """Send a text message to a user. Returns True on success.
 
         MAX: POST /messages?user_id=<id> with JSON body {"text": "...",
-        "format": "html"}, token in the Authorization header.
+        "format": "html", "attachments": [...]}, token in the Authorization header.
         """
         body: dict = {"text": text}
         if fmt:
             body["format"] = fmt
+        if attachments is not None:
+            body["attachments"] = attachments
         try:
             response = self._client.post(
                 "/messages",
@@ -61,6 +69,43 @@ class MaxClient:
             return True
         except httpx.HTTPError as exc:  # never let MAX I/O crash a handler
             logger.exception("MAX send_message error: %s", exc)
+            return False
+
+    def answer_callback(
+        self,
+        callback_id: str,
+        text: str | None = None,
+        attachments: list | None = None,
+        notification: str | None = None,
+        fmt: str | None = "html",
+    ) -> bool:
+        """Respond to an inline-button press.
+
+        MAX: POST /answers?callback_id=<id>. A ``message`` body edits the original
+        message (text + keyboard) in place; ``notification`` shows a toast.
+        """
+        body: dict = {}
+        if text is not None or attachments is not None:
+            message: dict = {"text": text or ""}
+            if fmt:
+                message["format"] = fmt
+            if attachments is not None:
+                message["attachments"] = attachments
+            body["message"] = message
+        if notification:
+            body["notification"] = notification
+        try:
+            response = self._client.post(
+                "/answers", params={"callback_id": str(callback_id)}, json=body
+            )
+            if response.status_code >= 400:
+                logger.error(
+                    "MAX answer_callback failed: %s %s", response.status_code, response.text
+                )
+                return False
+            return True
+        except httpx.HTTPError as exc:
+            logger.exception("MAX answer_callback error: %s", exc)
             return False
 
     def set_webhook(self, url: str, secret: str | None = None) -> bool:

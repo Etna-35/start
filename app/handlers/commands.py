@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.handlers.admin import handle_admin_stats
 from app.models.user import User
+from app.schemas.dto import Reply
 from app.repositories import time_entries as entry_repo
 from app.repositories import users as user_repo
 from app.services import community_stats_service as community
@@ -19,7 +20,7 @@ from app.services.time_settings import effective_review_time, format_hhmm, parse
 
 def handle_command(
     session: Session, user: User, text: str, settings: Settings, day: date
-) -> str:
+) -> str | Reply:
     command = text.split()[0].lower().lstrip("/")
     command = command.split("@")[0]  # tolerate /cmd@botname
 
@@ -35,7 +36,17 @@ def handle_command(
         return messages.NEED_CONSENT
 
     if command == "today":
-        return review_service.render_today(session, user.id, day) or messages.NO_ENTRIES_TODAY
+        view = review_service.render_today(session, user.id, day)
+        if view is None:
+            return messages.NO_ENTRIES_TODAY
+        text, attachments = view
+        return Reply(text, attachments)
+    if command in ("done", "finish", "review", "оценить", "завершить"):
+        view = review_service.start_interactive(session, user.id, day)
+        if view is None:
+            return review_service.build_day_summary_text(session, user.id, day)
+        text, attachments = view
+        return Reply(text, attachments)
     if command == "summary":
         return review_service.build_day_summary_text(session, user.id, day)
     if command == "community":

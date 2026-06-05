@@ -74,6 +74,7 @@ HELP = (
     "Дальше просто отмечаю каждую запись галочкой ✅.</i>\n\n"
     "<b>Команды</b>\n"
     "/today — список за сегодня\n"
+    "/done — завершить день и оценить сейчас\n"
     "/summary — итог дня\n"
     "/community — обезличенная статистика сообщества\n"
     "/export — экспорт за 7 дней\n"
@@ -110,6 +111,9 @@ REVIEW_INSTRUCTIONS = (
 # Text (non-slash) messages that should also show help.
 HELP_ALIASES = {"помощь", "справка", "правила", "help", "хелп"}
 
+# Text (non-slash) messages that start the evening scoring early.
+FINISH_ALIASES = {"завершить", "завершить день", "оценить", "оценить день", "закончить день"}
+
 # Acknowledgement for entries after the first one of the day.
 ENTRY_ACK = "✅"
 
@@ -120,6 +124,8 @@ def first_entry_reply(duration_str: str, action_text: str, review_time: str) -> 
         "Записал ✅\n"
         f"<b>{duration_str}</b> — {action_text}\n\n"
         "Это первая запись за сегодня. Шли действия в течение дня, "
-        f"а вечером в <b>{review_time}</b> я пришлю список — оценишь каждое по <b>A/B/C/D</b>.\n"
+        f"а вечером в <b>{review_time}</b> я пришлю список — оценишь каждое по <b>A/B/C/D</b>.\n\n"
+        "⏰ Выбери удобное время вечерней оценки кнопками ниже "
+        "(или задай своё командой /time 21:30).\n"
         "<i>Правила оценок: /help</i>"
     )

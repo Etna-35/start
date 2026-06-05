@@ -1,5 +1,5 @@
-"""Orchestration around daily review: rendering numbered lists, applying scores,
-and building the per-user daily summary from DB entries."""
+"""Orchestration around daily review: the interactive button flow, the text
+fallback ("1A 2B"), and the per-user daily summary built from DB entries."""
 
 from __future__ import annotations
 
@@ -9,13 +9,16 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.models.review_session import DailyReviewSession
-from app.models.time_entry import TimeEntry, VALID_SCORES
+from app.models.time_entry import VALID_SCORES, TimeEntry
 from app.repositories import review_sessions as review_repo
 from app.repositories import time_entries as entry_repo
-from app.services import messages
+from app.services import keyboards, messages
 from app.services.formatting import esc
 from app.services.summary_service import EntryStat, build_summary, format_summary
 from app.services.timefmt import format_minutes
+
+# A reply that carries an inline keyboard: (text, attachments | None).
+ReviewView = tuple[str, list | None]
 
 
 def _render_list(entries: list[TimeEntry], with_scores: bool) -> str:
@@ -30,40 +33,102 @@ def _render_list(entries: list[TimeEntry], with_scores: bool) -> str:
     return "\n".join(lines)
 
 
-def render_today(session: Session, user_id: uuid.UUID, day: date) -> str | None:
-    """Build the /today list and persist a review session with the shown order.
-    Returns None if there are no entries today."""
+# --- Interactive (button) flow -------------------------------------------------
+
+def render_item(entries: list[TimeEntry], entry: TimeEntry) -> ReviewView:
+    """Render a single action to score, with the A/B/C/D keyboard."""
+    total = len(entries)
+    remaining = sum(1 for e in entries if e.abc_score is None)
+    text = (
+        f"<b>Оценка дня</b> · осталось {remaining} из {total}\n\n"
+        f"<b>{format_minutes(entry.duration_min)}</b> — {esc(entry.action_text)}\n\n"
+        "<i>A — собственник · B — управление · C — операционка · D — слив</i>"
+    )
+    return text, keyboards.score_keyboard(str(entry.id))
+
+
+def render_done(session: Session, user_id: uuid.UUID, day: date) -> ReviewView:
+    """Scoring finished: show the day's summary and clear the keyboard ([]).
+    An empty attachments list removes the buttons from the edited message."""
+    return build_day_summary_text(session, user_id, day), []
+
+
+def _next_unscored_after(entries: list[TimeEntry], after_id: str) -> TimeEntry | None:
+    seen = False
+    for e in entries:
+        if seen and e.abc_score is None:
+            return e
+        if str(e.id) == after_id:
+            seen = True
+    return None
+
+
+def render_next_item(
+    session: Session, user_id: uuid.UUID, day: date, after: str | None = None
+) -> ReviewView:
+    entries = entry_repo.list_for_day(session, user_id, day)
+    if after is not None:
+        nxt = _next_unscored_after(entries, after)
+    else:
+        nxt = next((e for e in entries if e.abc_score is None), None)
+    if nxt is None:
+        return render_done(session, user_id, day)
+    return render_item(entries, nxt)
+
+
+def start_interactive(session: Session, user_id: uuid.UUID, day: date) -> ReviewView | None:
+    """Begin the button-based scoring. Returns None if nothing to score.
+    Also records a review session so the text fallback ('1A 2B') keeps working."""
+    entries = entry_repo.list_for_day(session, user_id, day)
+    unscored = [e for e in entries if e.abc_score is None]
+    if not unscored:
+        return None
+    review_repo.create(session, user_id, day, [str(e.id) for e in entries])
+    return render_item(entries, unscored[0])
+
+
+def set_score_by_id(session: Session, entry_id: str, score: str) -> None:
+    if score not in VALID_SCORES:
+        return
+    entry = entry_repo.get_by_ids(session, [entry_id]).get(entry_id)
+    if entry is not None:
+        entry.abc_score = score
+
+
+def bulk_score_remaining(session: Session, user_id: uuid.UUID, day: date, score: str) -> int:
+    if score not in VALID_SCORES:
+        return 0
+    applied = 0
+    for entry in entry_repo.list_for_day(session, user_id, day):
+        if entry.abc_score is None:
+            entry.abc_score = score
+            applied += 1
+    return applied
+
+
+# --- Overview (/today) ---------------------------------------------------------
+
+def render_today(session: Session, user_id: uuid.UUID, day: date) -> ReviewView | None:
+    """Build the /today overview list + an 'Оценить' button. None if no entries."""
     entries = entry_repo.list_for_day(session, user_id, day)
     if not entries:
         return None
     review_repo.create(session, user_id, day, [str(e.id) for e in entries])
     body = _render_list(entries, with_scores=True)
-    return (
+    text = (
         "<b>Твои действия сегодня</b>\n\n"
         f"{body}\n\n"
-        "Чтобы оценить, напиши:\n"
-        "<b>1A 2B 3D</b>"
+        "Оцени кнопкой ниже или напиши, например: <b>1A 2B 3D</b>"
     )
+    return text, keyboards.start_keyboard()
 
 
-def render_evening_review(session: Session, user_id: uuid.UUID, day: date) -> str | None:
-    """Build the evening prompt over unscored entries. Returns None if none."""
-    entries = entry_repo.list_unscored_for_day(session, user_id, day)
-    if not entries:
-        return None
-    review_repo.create(session, user_id, day, [str(e.id) for e in entries])
-    body = _render_list(entries, with_scores=False)
-    return (
-        f"{messages.REVIEW_PROMPT_HEADER}\n\n"
-        f"{body}\n\n"
-        f"{messages.REVIEW_INSTRUCTIONS}"
-    )
-
+# --- Text fallback ("1A 2B 3D") ------------------------------------------------
 
 def apply_scores(
     session: Session, user_id: uuid.UUID, day: date, scores: dict[int, str]
 ) -> tuple[int, DailyReviewSession | None]:
-    """Apply numbered scores against the latest pending session for the day.
+    """Apply numbered scores against the latest session for the day.
     Returns (applied_count, session). applied_count == -1 means no session."""
     review = review_repo.latest_pending_for_day(session, user_id, day)
     if review is None:

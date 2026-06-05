@@ -45,11 +45,12 @@ def run_daily_review_tick(
             if review_repo.latest_for_day(session, user.id, day) is not None:
                 continue  # already prompted (or used /today) today
 
-            prompt = review_service.render_evening_review(session, user.id, day)
-            if prompt is None:
-                continue  # no entries today — don't spam
+            view = review_service.start_interactive(session, user.id, day)
+            if view is None:
+                continue  # nothing left to score — don't spam
 
-            if max_client.send_message(user.max_user_id, prompt):
+            text, attachments = view
+            if max_client.send_message(user.max_user_id, text, attachments=attachments):
                 sent += 1
 
     if sent:

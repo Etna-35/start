@@ -8,7 +8,8 @@ from app.config import Settings
 from app.models.user import User
 from app.repositories import parse_errors as parse_error_repo
 from app.repositories import time_entries as entry_repo
-from app.services import messages
+from app.schemas.dto import Reply
+from app.services import keyboards, messages
 from app.services.duration_parser import parse_entry
 from app.services.formatting import esc
 from app.services.time_settings import effective_review_time, format_hhmm
@@ -17,7 +18,7 @@ from app.services.timefmt import format_minutes
 
 def handle_entry(
     session: Session, user: User, raw_text: str, day: date, settings: Settings
-) -> str:
+) -> str | Reply:
     parsed = parse_entry(raw_text)
     if parsed is None:
         # On MVP we do not store entries without a duration; log the parse miss.
@@ -38,8 +39,10 @@ def handle_entry(
 
     if is_first:
         review_time = format_hhmm(*effective_review_time(user, settings))
-        return messages.first_entry_reply(
+        text = messages.first_entry_reply(
             format_minutes(parsed.duration_min), esc(parsed.action_text), review_time
         )
-    # Subsequent entries: a quiet green-check acknowledgement.
-    return messages.ENTRY_ACK
+        return Reply(text, keyboards.time_and_finish_keyboard())
+
+    # Subsequent entries: a quiet green-check ack + a one-tap "finish early" button.
+    return Reply(messages.ENTRY_ACK, keyboards.finish_keyboard())

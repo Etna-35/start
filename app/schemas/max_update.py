@@ -20,9 +20,28 @@ from __future__ import annotations
 
 import logging
 
-from app.schemas.dto import IncomingMessage
+from app.schemas.dto import CallbackQuery, IncomingMessage
 
 logger = logging.getLogger(__name__)
+
+
+def extract_callback(update: dict) -> CallbackQuery | None:
+    """Return a normalized CallbackQuery for a message_callback update, else None.
+    Never raises on malformed input."""
+    if not isinstance(update, dict) or update.get("update_type") != "message_callback":
+        return None
+    callback = update.get("callback") or {}
+    user = callback.get("user") or {}
+    user_id = _safe_str(user.get("user_id"))
+    callback_id = callback.get("callback_id")
+    if not user_id or not callback_id:
+        return None
+    return CallbackQuery(
+        max_user_id=user_id,
+        payload=callback.get("payload") or "",
+        callback_id=str(callback_id),
+        display_name=user.get("name"),
+    )
 
 # Update types that carry user text we should react to.
 _MESSAGE_UPDATE_TYPES = {"message_created", "message_edited"}
