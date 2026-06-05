@@ -1,0 +1,61 @@
+# Production stack: Postgres + app + Caddy (auto-HTTPS).
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Differences from the dev docker-compose.yml:
+#   - Postgres port is NOT published to the host (DB stays private).
+#   - The app is NOT published to the host; only Caddy reaches it internally.
+#   - Caddy terminates TLS for {$BOT_DOMAIN} and proxies to the app.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chrono
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chrono}
+      POSTGRES_DB: chrono
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chrono"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No `ports:` — the database is only reachable inside the compose network.
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://chrono:${POSTGRES_PASSWORD:-chrono}@db:5432/chrono
+    expose:
+      - "8000"          # internal only; reached by Caddy, not the public internet
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    env_file:
+      - .env            # provides BOT_DOMAIN and ACME_EMAIL
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

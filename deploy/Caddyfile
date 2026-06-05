@@ -1,0 +1,18 @@
+# Reverse proxy with automatic HTTPS (Let's Encrypt) for the bot subdomain.
+# BOT_DOMAIN and ACME_EMAIL come from the .env file (see docker-compose.prod.yml).
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$BOT_DOMAIN} {
+	encode gzip
+
+	# Forward everything to the FastAPI app on the internal docker network.
+	reverse_proxy app:8000
+
+	log {
+		output stdout
+		format console
+	}
+}
