@@ -33,6 +33,15 @@ def _keyboard(rows: list[list[dict]]) -> list:
     return [{"type": "inline_keyboard", "payload": {"buttons": rows}}]
 
 
+# Public helpers for building custom keyboards (e.g. the paged scoring list).
+def button(text: str, payload: str, intent: str = "default") -> dict:
+    return _cb(text, payload, intent)
+
+
+def inline(rows: list[list[dict]]) -> list:
+    return _keyboard(rows)
+
+
 def score_keyboard(entry_id: str) -> list:
     return _keyboard(
         [

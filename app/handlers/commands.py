@@ -42,10 +42,7 @@ def handle_command(
         text, attachments = view
         return Reply(text, attachments)
     if command in ("done", "finish", "review", "оценить", "завершить"):
-        view = review_service.start_interactive(session, user.id, day)
-        if view is None:
-            return review_service.build_day_summary_text(session, user.id, day)
-        text, attachments = view
+        text, attachments = review_service.begin_view(session, user.id, day)
         return Reply(text, attachments)
     if command == "summary":
         return review_service.build_day_summary_text(session, user.id, day)

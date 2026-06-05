@@ -84,6 +84,8 @@ def _handle_callback(
             cb.callback_id,
             notification="Не понял действие. Обнови список командой /today.",
         )
+    elif result.silent:
+        max_client.answer_callback(cb.callback_id)
     elif result.view is not None:
         text, attachments = result.view
         max_client.answer_callback(cb.callback_id, text=text, attachments=attachments)
@@ -124,10 +126,7 @@ def _route(session: Session, incoming: IncomingMessage, settings: Settings) -> s
 
     # Plain-text "finish the day early" triggers.
     if text.lower() in messages.FINISH_ALIASES:
-        view = review_service.start_interactive(session, user.id, day)
-        if view is None:
-            return review_service.build_day_summary_text(session, user.id, day)
-        return Reply(*view)
+        return Reply(*review_service.begin_view(session, user.id, day))
 
     if is_review_format(text):
         return review_handler.handle_review(session, user, text, day)

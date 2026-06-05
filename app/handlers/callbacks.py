@@ -31,25 +31,36 @@ def handle_callback(
     args = parts[2:]
 
     if action == "start":
-        return CallbackResult(view=review_service.render_next_item(session, user.id, day))
+        return CallbackResult(view=review_service.begin_view(session, user.id, day))
 
-    if action == "s" and len(args) >= 2:
-        review_service.set_score_by_id(session, args[0], args[1])
-        return CallbackResult(view=review_service.render_next_item(session, user.id, day))
+    if action == "p" and args:
+        page = _to_int(args[0])
+        return CallbackResult(view=review_service.render_page_view(session, user.id, day, page))
 
-    if action == "k" and len(args) >= 1:
-        return CallbackResult(
-            view=review_service.render_next_item(session, user.id, day, after=args[0])
-        )
+    if action == "s" and len(args) >= 3:
+        entry_id, score = args[0], args[1]
+        page = _to_int(args[2])
+        review_service.set_score_by_id(session, entry_id, score)
+        return CallbackResult(view=review_service.after_score_view(session, user.id, day, page))
 
-    if action == "b" and len(args) >= 1:
+    if action == "b" and args:
         review_service.bulk_score_remaining(session, user.id, day, args[0])
         return CallbackResult(view=review_service.render_done(session, user.id, day))
 
     if action == "done":
         return CallbackResult(view=review_service.render_done(session, user.id, day))
 
+    if action == "x":  # item-number label — just acknowledge
+        return CallbackResult(silent=True)
+
     return None
+
+
+def _to_int(value: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _set_time(session: Session, user: User, raw: str) -> CallbackResult:

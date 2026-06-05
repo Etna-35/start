@@ -38,7 +38,9 @@ class CallbackResult:
 
     - ``view`` = (text, attachments) → edit the original message in place.
     - ``notification`` → show a transient toast, leave the message unchanged.
+    - ``silent`` → just acknowledge the press (no edit, no toast).
     """
 
     view: tuple | None = None
     notification: str | None = None
+    silent: bool = False

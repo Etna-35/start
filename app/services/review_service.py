@@ -33,18 +33,61 @@ def _render_list(entries: list[TimeEntry], with_scores: bool) -> str:
     return "\n".join(lines)
 
 
-# --- Interactive (button) flow -------------------------------------------------
+# --- Interactive paged scoring -------------------------------------------------
 
-def render_item(entries: list[TimeEntry], entry: TimeEntry) -> ReviewView:
-    """Render a single action to score, with the A/B/C/D keyboard."""
+PAGE_SIZE = 10
+
+
+def render_page(entries: list[TimeEntry], page: int) -> ReviewView:
+    """Render a page of up to PAGE_SIZE actions: numbered list with ✅ marks,
+    plus per-item A/B/C/D buttons, page navigation, and bulk options."""
     total = len(entries)
-    remaining = sum(1 for e in entries if e.abc_score is None)
-    text = (
-        f"<b>Оценка дня</b> · осталось {remaining} из {total}\n\n"
-        f"<b>{format_minutes(entry.duration_min)}</b> — {esc(entry.action_text)}\n\n"
-        "<i>A — собственник · B — управление · C — операционка · D — слив</i>"
+    max_page = max(0, (total - 1) // PAGE_SIZE) if total else 0
+    page = max(0, min(page, max_page))
+    start = page * PAGE_SIZE
+    end = min(start + PAGE_SIZE, total)
+    page_entries = entries[start:end]
+    scored = sum(1 for e in entries if e.abc_score)
+
+    lines = [f"<b>Оценка дня</b> · оценено {scored}/{total}", ""]
+    for i, e in enumerate(page_entries):
+        num = start + i + 1
+        base = f"<b>{num}.</b> {format_minutes(e.duration_min)} — {esc(e.action_text)}"
+        if e.abc_score:
+            lines.append(f"✅ {base} · <b>{e.abc_score}</b>")
+        else:
+            lines.append(f"▫️ {base}")
+    text = "\n".join(lines)
+
+    rows: list[list[dict]] = []
+    for i, e in enumerate(page_entries):
+        num = start + i + 1
+        eid = str(e.id)
+        rows.append(
+            [
+                keyboards.button(f"{num}", "rv|x"),
+                keyboards.button("A", f"rv|s|{eid}|A|{page}", "positive"),
+                keyboards.button("B", f"rv|s|{eid}|B|{page}"),
+                keyboards.button("C", f"rv|s|{eid}|C|{page}"),
+                keyboards.button("D", f"rv|s|{eid}|D|{page}", "negative"),
+            ]
+        )
+    nav: list[dict] = []
+    if start > 0:
+        nav.append(keyboards.button("◀ Пред. 10", f"rv|p|{page - 1}"))
+    if end < total:
+        nav.append(keyboards.button("След. 10 ▶", f"rv|p|{page + 1}"))
+    nav.append(keyboards.button("✅ Завершить", "rv|done", "positive"))
+    rows.append(nav)
+    rows.append(
+        [
+            keyboards.button("Остальным B", "rv|b|B"),
+            keyboards.button("Остальным C", "rv|b|C"),
+            keyboards.button("Остальным D", "rv|b|D"),
+        ]
     )
-    attachments = keyboards.score_keyboard(str(entry.id))
+
+    attachments = keyboards.inline(rows)
     image = legend.legend_attachment()
     if image is not None:
         attachments = [image, *attachments]
@@ -52,43 +95,49 @@ def render_item(entries: list[TimeEntry], entry: TimeEntry) -> ReviewView:
 
 
 def render_done(session: Session, user_id: uuid.UUID, day: date) -> ReviewView:
-    """Scoring finished: show the day's summary and clear the keyboard ([]).
-    An empty attachments list removes the buttons from the edited message."""
+    """Scoring finished: show the day's summary and clear the keyboard ([])."""
     return build_day_summary_text(session, user_id, day), []
 
 
-def _next_unscored_after(entries: list[TimeEntry], after_id: str) -> TimeEntry | None:
-    seen = False
-    for e in entries:
-        if seen and e.abc_score is None:
-            return e
-        if str(e.id) == after_id:
-            seen = True
-    return None
-
-
-def render_next_item(
-    session: Session, user_id: uuid.UUID, day: date, after: str | None = None
-) -> ReviewView:
+def begin_view(session: Session, user_id: uuid.UUID, day: date) -> ReviewView:
+    """Manual start (button / command / text). Always returns a view."""
     entries = entry_repo.list_for_day(session, user_id, day)
-    if after is not None:
-        nxt = _next_unscored_after(entries, after)
-    else:
-        nxt = next((e for e in entries if e.abc_score is None), None)
-    if nxt is None:
+    if not entries:
+        return messages.NO_ENTRIES_TODAY, []
+    review_repo.create(session, user_id, day, [str(e.id) for e in entries])
+    if all(e.abc_score for e in entries):
         return render_done(session, user_id, day)
-    return render_item(entries, nxt)
+    return render_page(entries, 0)
 
 
 def start_interactive(session: Session, user_id: uuid.UUID, day: date) -> ReviewView | None:
-    """Begin the button-based scoring. Returns None if nothing to score.
-    Also records a review session so the text fallback ('1A 2B') keeps working."""
+    """Scheduler start: None if nothing left to score (don't spam)."""
     entries = entry_repo.list_for_day(session, user_id, day)
-    unscored = [e for e in entries if e.abc_score is None]
-    if not unscored:
+    if not any(e.abc_score is None for e in entries):
         return None
     review_repo.create(session, user_id, day, [str(e.id) for e in entries])
-    return render_item(entries, unscored[0])
+    return render_page(entries, 0)
+
+
+def render_page_view(session: Session, user_id: uuid.UUID, day: date, page: int) -> ReviewView:
+    entries = entry_repo.list_for_day(session, user_id, day)
+    if not entries:
+        return render_done(session, user_id, day)
+    return render_page(entries, page)
+
+
+def after_score_view(session: Session, user_id: uuid.UUID, day: date, page: int) -> ReviewView:
+    entries = entry_repo.list_for_day(session, user_id, day)
+    if entries and all(e.abc_score for e in entries):
+        return render_done(session, user_id, day)
+    # Auto-advance when the current page is fully scored and more pages remain.
+    total = len(entries)
+    start = page * PAGE_SIZE
+    end = min(start + PAGE_SIZE, total)
+    page_entries = entries[start:end]
+    if page_entries and all(e.abc_score for e in page_entries) and end < total:
+        page += 1
+    return render_page(entries, page)
 
 
 def set_score_by_id(session: Session, entry_id: str, score: str) -> None:
