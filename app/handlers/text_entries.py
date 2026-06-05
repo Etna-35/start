@@ -44,5 +44,5 @@ def handle_entry(
         )
         return Reply(text, keyboards.time_and_finish_keyboard())
 
-    # Subsequent entries: a quiet green-check ack + a one-tap "finish early" button.
-    return Reply(messages.ENTRY_ACK, keyboards.finish_keyboard())
+    # Subsequent entries: a quiet, lightweight green-check ack (no buttons).
+    return messages.ENTRY_ACK

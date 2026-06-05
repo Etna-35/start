@@ -65,7 +65,6 @@ def _send(max_client: MaxClient, user_id: str, reply: str | Reply | None) -> Non
 def _handle_callback(
     session: Session, cb: CallbackQuery, max_client: MaxClient, settings: Settings
 ) -> None:
-    logger.info("callback payload=%r from %s", cb.payload, cb.max_user_id)
     try:
         user = user_repo.get_or_create(
             session,
@@ -110,7 +109,7 @@ def _route(session: Session, incoming: IncomingMessage, settings: Settings) -> s
         entry_repo.soft_delete_for_day(session, user.id, day)
         return messages.DELETED_TODAY
     if text == messages.CONFIRM_PHRASE_ME:
-        user_repo.soft_delete(session, user)
+        user_repo.hard_delete(session, user)
         return messages.DELETED_ME
 
     if text.startswith("/"):

@@ -13,10 +13,17 @@ def get_by_max_id(session: Session, max_user_id: str) -> User | None:
     return session.scalar(stmt)
 
 
+def get_by_max_id_any(session: Session, max_user_id: str) -> User | None:
+    """Look up by max_user_id ignoring soft-delete (max_user_id is unique)."""
+    return session.scalar(select(User).where(User.max_user_id == max_user_id))
+
+
 def get_or_create(
     session: Session, max_user_id: str, display_name: str | None, admin_ids: list[str], default_tz: str
 ) -> User:
-    user = get_by_max_id(session, max_user_id)
+    # Look up ignoring deleted_at so a leftover (soft-deleted) row never collides
+    # with the unique max_user_id constraint on insert.
+    user = get_by_max_id_any(session, max_user_id)
     role = ROLE_ADMIN if max_user_id in admin_ids else ROLE_MEMBER
     if user is None:
         user = User(
@@ -28,6 +35,11 @@ def get_or_create(
         session.add(user)
         session.flush()
         return user
+
+    # Revive a previously soft-deleted profile (fresh start → re-consent).
+    if user.deleted_at is not None:
+        user.deleted_at = None
+        user.consent_accepted = False
 
     # Keep display name and admin role fresh.
     if display_name and user.display_name != display_name:
@@ -48,6 +60,12 @@ def set_review_time(session: Session, user: User, hour: int, minute: int) -> Non
 
 def soft_delete(session: Session, user: User) -> None:
     user.deleted_at = datetime.now(timezone.utc)
+
+
+def hard_delete(session: Session, user: User) -> None:
+    """Fully remove the profile and all its data (entries, review sessions
+    cascade via ORM; parse_errors.user_id is set NULL by the DB)."""
+    session.delete(user)
 
 
 def all_consented(session: Session) -> list[User]:
