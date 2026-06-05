@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     default_timezone: str = "Europe/Moscow"
 
+    # Path to the A/B/C/D legend image shown at the start of scoring.
+    # If the file is absent, the image hint is silently disabled.
+    legend_image_path: str = "assets/legend.png"
+
     # Daily review schedule (interpreted in each user's local timezone)
     daily_review_hour: int = 22
     daily_review_minute: int = 30

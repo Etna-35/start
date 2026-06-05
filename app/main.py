@@ -24,6 +24,16 @@ async def lifespan(app: FastAPI):
         scheduler.start()
         logger.info("Daily review scheduler started")
 
+    # Upload the A/B/C/D legend image once (no-op if file missing or no token).
+    if settings.max_bot_token:
+        try:
+            from app.services import legend
+            from app.services.max_client import get_max_client
+
+            legend.load_legend(get_max_client(), settings.legend_image_path)
+        except Exception:
+            logger.exception("Legend image load failed")
+
     try:
         yield
     finally:

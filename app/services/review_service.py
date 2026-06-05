@@ -12,7 +12,7 @@ from app.models.review_session import DailyReviewSession
 from app.models.time_entry import VALID_SCORES, TimeEntry
 from app.repositories import review_sessions as review_repo
 from app.repositories import time_entries as entry_repo
-from app.services import keyboards, messages
+from app.services import keyboards, legend, messages
 from app.services.formatting import esc
 from app.services.summary_service import EntryStat, build_summary, format_summary
 from app.services.timefmt import format_minutes
@@ -44,7 +44,11 @@ def render_item(entries: list[TimeEntry], entry: TimeEntry) -> ReviewView:
         f"<b>{format_minutes(entry.duration_min)}</b> — {esc(entry.action_text)}\n\n"
         "<i>A — собственник · B — управление · C — операционка · D — слив</i>"
     )
-    return text, keyboards.score_keyboard(str(entry.id))
+    attachments = keyboards.score_keyboard(str(entry.id))
+    image = legend.legend_attachment()
+    if image is not None:
+        attachments = [image, *attachments]
+    return text, attachments
 
 
 def render_done(session: Session, user_id: uuid.UUID, day: date) -> ReviewView:

@@ -10,6 +10,7 @@ parameter is deprecated.
 from __future__ import annotations
 
 import logging
+import os
 
 import httpx
 
@@ -107,6 +108,37 @@ class MaxClient:
         except httpx.HTTPError as exc:
             logger.exception("MAX answer_callback error: %s", exc)
             return False
+
+    def upload_image(self, path: str) -> str | None:
+        """Upload an image and return a reusable token (3-step MAX flow):
+        POST /uploads?type=image -> {url}; POST the file to {url} -> {token}.
+        Returns None on any failure."""
+        try:
+            meta = self._client.post("/uploads", params={"type": "image"})
+            if meta.status_code >= 400:
+                logger.error("MAX /uploads failed: %s %s", meta.status_code, meta.text)
+                return None
+            url = (meta.json() or {}).get("url")
+            if not url:
+                logger.error("MAX /uploads returned no url")
+                return None
+            with open(path, "rb") as fh:
+                up = httpx.post(
+                    url,
+                    files={"data": (os.path.basename(path), fh, "image/png")},
+                    timeout=60.0,
+                )
+            if up.status_code >= 400:
+                logger.error("MAX image upload failed: %s %s", up.status_code, up.text)
+                return None
+            token = (up.json() or {}).get("token")
+            if not token:
+                logger.error("MAX image upload returned no token")
+                return None
+            return token
+        except (httpx.HTTPError, OSError, ValueError) as exc:
+            logger.exception("MAX upload_image error: %s", exc)
+            return None
 
     def set_webhook(self, url: str, secret: str | None = None) -> bool:
         """Register the webhook URL with MAX (subscriptions endpoint).
