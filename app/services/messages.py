@@ -123,7 +123,7 @@ ENTRY_ACK = "✔️ записано"
 def first_entry_reply(duration_str: str, action_text: str, review_time: str) -> str:
     """action_text MUST already be HTML-escaped by the caller."""
     return (
-        "Записал ✅\n"
+        "✔️ Записал:\n"
         f"<b>{duration_str}</b> — {action_text}\n\n"
         "Это первая запись за сегодня. Шли действия в течение дня, "
         f"а вечером в <b>{review_time}</b> я пришлю список — оценишь каждое по <b>A/B/C/D</b>.\n\n"
